@@ -1,4 +1,9 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage");
+local Players = game:GetService("Players")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer.PlayerGui;
+
 local Terrain = workspace.Terrain;
 
 local Remotes = ReplicatedStorage.Remotes
@@ -8,8 +13,9 @@ local MergeItem = Remotes.MergeItem
 local UseItem = Remotes.UseItem
 
 local Mergers = Terrain.Mergers;
-local LocalMerger = Mergers:GetChildren()[1]
-local Items = LocalMerger.Items
+local LocalMerger = Mergers["Merger1"]
+local Items = LocalMerger.Items;
+local Requesters = LocalMerger.Requesters;
 
 local function GetGenerator()
     local Gen = nil;
@@ -30,7 +36,7 @@ local function GetGenerator()
 end
 
 local TiersVerification = {
-    ["Tier1"] = function(Part)
+  --[[  ["Tier1"] = function(Part)
         return Part.Color == Color3.fromRGB(165, 0, 0);
     end;
     ["Tier2"] = function(Part)
@@ -47,9 +53,35 @@ local TiersVerification = {
     end;
     ["Tier6"] = function(Part)
         return Part.Color == Color3.fromRGB(58, 74, 165);
-    end
+    end;
+    ["Tier7"] = function(Part)
+        return Part.Color == Color3.fromRGB(129, 43, 165);
+    end;
+    ["Tier8"] = function(Part)
+        return Part.Color == Color3.fromRGB(0, 0, 0)
+    end]]
 }
 
+local function MapTiers()
+    for Index, Value in pairs(ReplicatedStorage.Items.Materials.Part:GetChildren()) do
+        local Part = Value:FindFirstChild("Part")
+        
+        if Part then
+            TiersVerification["Tier"..tostring(Value.Name)] = function(_Part)
+                return _Part.Color == Part.Color;
+            end
+        end
+    end
+end
+MapTiers()
+
+local function GetType(Part)
+    for Index, Func in pairs(TiersVerification) do
+        if Func(Part) then
+            return Index, Func
+        end
+    end
+end
 
 local function ParseTiles()
     local Tiers = {}
@@ -107,6 +139,75 @@ local function GenerateItems(Amount)
     end
 end
 
-GenerateItems()
-MergeItems(ParseTiles())
+local function ParseTasks()
+    local Floaters = PlayerGui:FindFirstChild("Floaters")
+    
+    local Tasks = {}
+    
+    if Floaters then
+        for Index, Value in pairs (Floaters:GetChildren()) do
+            if Value.Name == "Task" then
+                local Wants = Value:FindFirstChild("Wants")
+                
+                if Wants then
+                    Tasks[Value] = {}
+                    
+                    for Index, Task in pairs(Wants:GetChildren()) do
+                        if Task.Name == "TaskItem" then
+                            local Model = Task:FindFirstChildOfClass("Model")
+                            
+                            if Model then
+                                local Part = Model:FindFirstChild("Part")
+                                
+                                if Part then
+                                    Tasks[Value][Task] = {
+                                        Type = GetType(Part);
+                                    }
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return Tasks
+end
+
+local function FireAllRequesters()
+    for Index, Value in pairs(Requesters:GetDescendants()) do
+        if Value:IsA("TouchTransmitter") then
+            LocalPlayer.Character:PivotTo(Value.Parent:GetPivot())  -- couldn't figure out what ui corresponds to which touchtransmitter + too lazy will fix later
+            wait(0.8)
+        end
+    end
+end
+
+local function FinishTasks()
+    for TaskHoldersObj, TaskHolders in pairs(ParseTasks()) do
+        for TaskObj, Task in pairs(TaskHolders) do
+            local Type = Task.Type;
+            
+            for Index, Value in pairs(Items:GetChildren()) do
+                if TiersVerification[Type](Value.Part) then
+                    local Split = Value.Name:split(":")
+                    
+                    TakeItem:FireServer(tonumber(Split[1]), tonumber(Split[2]))
+                    FireAllRequesters()
+                    break
+                end
+            end
+        end
+    end
+end
+
+shared.looped = true;
+
+while shared.looped do
+    GenerateItems()
+    FinishTasks()
+    MergeItems(ParseTiles())
+    wait()
+end
 
