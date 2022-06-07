@@ -13,7 +13,20 @@ local MergeItem = Remotes.MergeItem
 local UseItem = Remotes.UseItem
 
 local Mergers = Terrain.Mergers;
-local LocalMerger = Mergers["Merger1"]
+
+local function GetMerger()
+    for Index, Value in pairs(Mergers:GetChildren()) do
+        local Attributes = Value:GetAttributes();
+        
+        if Attributes["Owner"] then
+            if Attributes["Owner"] == LocalPlayer.UserId then
+                return Value;
+            end
+        end
+    end
+end
+
+local LocalMerger = GetMerger()
 local Items = LocalMerger.Items;
 local Requesters = LocalMerger.Requesters;
 
